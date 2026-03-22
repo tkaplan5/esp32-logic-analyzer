@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 # [ ===== INIT ===== ]
 
 s = None # Serial communication handle
-port = '' # Port for serial communication
-baudrate = 0 # Baudrate for serial communication
+port = 'COM3' # Port for serial communication
+baudrate = 115200 # Baudrate for serial communication
 bufserial = '' # Very big bytestring for bufferizing data received on serial
                 # We cannot analyze it on-the-fly for performance reasons
 bufrle = [] # Preprocessed buffer

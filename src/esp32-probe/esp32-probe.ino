@@ -1,3 +1,7 @@
+#include <Arduino_FreeRTOS.h>
+
+//#include <FreeRTOS.h>
+
 /*
  * Basically, we have here 3 processes running on the two different cores of the ESP32:
  *  - the first process is running on core 1 and it is responsible for collecting the data from a sensor connected to the probe pin;
@@ -9,10 +13,11 @@
 
 // [ ===== SETTINGS ===== ]
 
-const int probe = 23; // Probe pin (you should connect a proper pull-up/pull-down resistor there!)
-const int serial_baudrate = 500000; // Don't go over 1MHz, otherwise you will read pretty much garbage
-const int bufsize = 9000; // Size of the internal buffer (doesn't compile if too big)
-const bool enable_bufmonitor = true; // Whether to enable the buffer-manager process
+
+const int probe = 8; // Probe pin (you should connect a proper pull-up/pull-down resistor there!)
+const int serial_baudrate = 115200; // Don't go over 1MHz, otherwise you will read pretty much garbage
+const int bufsize = 512; // Size of the internal buffer (doesn't compile if too big)
+const bool enable_bufmonitor = false; // Whether to enable the buffer-manager process
                                      // Disabling it will leave more CPU power for the serial-manager process
 const int bufmonitor_interval = 1000; // Time interval (in milliseconds) when to check for buffer space
 
@@ -32,7 +37,7 @@ int prod_idx = 0; // Buffer index for the producer (data-collector process)
 bufelem_t *prod_ptr; // Buffer pointer for the producer (for speeding it up)
 
 // Processes
-TaskHandle_t sermanager_handle, bufmanager_handle;
+TaskHandle_t sermanager_handle, bufmanager_handle, dataloop_handle;
 
 // [ ===== INIT ===== ]
 
@@ -45,16 +50,59 @@ void setup() {
   // Enable serial communication here (will be used by both serial-manager and buffer-manager
   Serial.begin(serial_baudrate);
   
+  delay(1000);
+
+  Serial.println("Started");
+
+
   // First disable the watchdog timer for core 0, otherwise it will reboot the ESP every 3/4 seconds
-  disableCore0WDT();
+// #if CONFIG_ARDUINO_RUNNING_CORE == 0
+//   disableCore0WDT();
+// #endif
+// #if CONFIG_ARDUINO_RUNNING_CORE == 1
+//   disableCore1WDT();
+// #endif
   
   // Create the other task(s)
   // Args: code function, name, stack size (in words), input parameter, priority (the higher the better), handle, core number
-  xTaskCreatePinnedToCore(sermanager, "serialManager", 10000, NULL, 1, &sermanager_handle, 0);
-  if (enable_bufmonitor) xTaskCreatePinnedToCore(bufmanager, "bufferManager", 10000, NULL, 1, &bufmanager_handle, 0);
+  //xTaskCreatePinnedToCore(sermanager, "serialManager", 10000, NULL, 1, &sermanager_handle, 0);
 
+  //xTaskCreatePinnedToCore(sermanager, "serialManager", 10000, NULL, 1, &sermanager_handle, 0);
+
+
+  
+
+  if (xTaskCreate(sermanager, "serialManager", 128, NULL, 1, &sermanager_handle) != pdPASS)
+  {
+   Serial.println(F("CRITICAL: Task sermanager could not be created! Lower stack sizes."));
+  }
+
+  if (xTaskCreate(datacollect, "datacollect", 128, NULL, 1, &dataloop_handle) != pdPASS)
+  {
+     Serial.println(F("CRITICAL: Task datacollect could not be created! Lower stack sizes."));
+  }
+
+
+  Serial.println(F("x1"));
+  
+
+//  if (enable_bufmonitor) xTaskCreatePinnedToCore(bufmanager, "bufferManager", 10000, NULL, 1, &bufmanager_handle, 0);
+
+if (enable_bufmonitor) 
+  {
+      xTaskCreate(bufmanager, "bufferManager", 1024, NULL, 1, &bufmanager_handle);
+  }
+
+Serial.println(F("x2"));
+  
   // From now on, just care about core 1 tasks
-  datacollect_setup();
+  //datacollect_setup();
+
+  vTaskStartScheduler();
+
+
+  Serial.println(F("x3"));
+  
   
 }
 
