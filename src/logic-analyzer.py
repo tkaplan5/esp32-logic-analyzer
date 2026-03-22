@@ -35,7 +35,8 @@ def check_device():
         s = serial.Serial(port, baudrate)
         s.close()
         return True
-    except:
+    except Exception as e:
+        print(f'ERROR: check_device {e}')
         return False
 
 # Read a chunk of data from the serial port
